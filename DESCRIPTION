@@ -1,0 +1,23 @@
+Package: simms
+Title: Simulation of multistate tte and joint models
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Carlos",
+           family = "Traynor",
+           role = c("aut", "cre"),
+           email = "first.last@example.com")
+Description: What the package does (one paragraph).
+License: GPL (>=3)
+Depends:
+    R (>= 3.3.0),
+Imports:
+    MASS,
+    methods,
+    simsurv (>= 0.0.0),
+    simjm,	
+    stats
+Suggests:
+    dplyr (>= 0.5.0),
+    ggplot2 (>= 2.2.1)
+LazyData: true
+RoxygenNote: 6.1.1
