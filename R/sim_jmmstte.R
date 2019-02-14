@@ -21,9 +21,9 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
                   betaEvent_continuous01 = 0.5,
                   betaEvent_continuous02 = 0.4,
                   betaEvent_continuous12 = 0.3,
-                  betaEvent_assoc01 = 0.55,
-                  betaEvent_assoc02 = 0.57,
-                  betaEvent_assoc12 = 0.5,
+                  betaEvent_assoc01 = 0.48,
+                  betaEvent_assoc02 = 0.50,
+                  betaEvent_assoc12 = 0.52,
                   betaEvent_aux01 = 1.2,
                   betaEvent_aux02 = 0.8,
                   betaEvent_aux12 = 0.9,
@@ -31,7 +31,7 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
                   prob_Z1 = 0.5,
                   mean_Z2 = 0, sd_Z2 = 1,
                   max_yobs = 10,
-                  cens = c(199, 199),
+                  cens = c(19, 21),
                   max_fuptime = 20,
                   balanced = FALSE,
                   family = gaussian,
@@ -340,7 +340,7 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
   # Generate survival times
   transitions <- c("Event01", "Event02", "Event12")
   
-  ss01 <- simsurv(# the following arguments apply to 'simsurv'
+  ss01 <- simsurv2(# the following arguments apply to 'simsurv'
     hazard = jmmstte_hazard, x = covs, betas = betas, 
     idvar = "id", ids = covs$id,
     maxt = max_fuptime, interval = interval,
@@ -349,7 +349,7 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
     M = M, trajectory = fixed_trajectory,
     assoc = assoc, family = family, grp_assoc = grp_assoc)
   
-  ss02 <- simsurv(# the following arguments apply to 'simsurv'
+  ss02 <- simsurv2(# the following arguments apply to 'simsurv'
     hazard = jmmstte_hazard, x = covs, betas = betas, 
     idvar = "id", ids = covs$id,
     maxt = max_fuptime, interval = interval,
@@ -366,7 +366,7 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
   betas12 <- lapply(betas, function(d)  d[yesR, ])
   tstart <- ss01$eventtime[yesR]
   
-  ss12 <- simsurv(# the following arguments apply to 'simsurv'
+  ss12 <- simsurv2(# the following arguments apply to 'simsurv'
     hazard = jmmstte_hazard, x = covs12, betas = betas12, 
     idvar = "id", ids = covs12$id, tstart = tstart,
     maxt = max_fuptime, interval = interval,

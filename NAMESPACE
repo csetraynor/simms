@@ -3,6 +3,6 @@
 export(sim_idm)
 export(sim_idm_jm)
 export(simjm)
-export(simsurv)
+export(simsurv2)
 importFrom(methods,is)
 importFrom(stats,gaussian)

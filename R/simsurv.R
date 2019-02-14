@@ -337,7 +337,7 @@
 #'   times <- simsurv(hazard = haz, x = covdat, betas = betas, maxt = 10)
 #'   head(times)
 #'
-simsurv <- function(dist = c("weibull", "exponential", "gompertz"),
+simsurv2 <- function(dist = c("weibull", "exponential", "gompertz"),
                     lambdas, gammas, x, betas, tde, tdefunction = NULL,
                     mixture = FALSE, pmix = 0.5, hazard, loghazard,
                     cumhazard, logcumhazard, tstart = 0,
