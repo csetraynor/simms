@@ -340,7 +340,7 @@
 simsurv <- function(dist = c("weibull", "exponential", "gompertz"),
                     lambdas, gammas, x, betas, tde, tdefunction = NULL,
                     mixture = FALSE, pmix = 0.5, hazard, loghazard,
-                    cumhazard, logcumhazard,
+                    cumhazard, logcumhazard, tstart = 0,
                     idvar = NULL, ids = NULL, nodes = 15,
                     maxt = NULL, interval = c(1E-8, 500),
                     rootsolver = c("uniroot", "dfsane"), rootfun = log,
@@ -427,6 +427,10 @@ simsurv <- function(dist = c("weibull", "exponential", "gompertz"),
     N <- nrow(x) # number of individuals
     ids <- seq(N)
   }
+  
+  tstart <- maybe_broadcast(tstart, length(ids))
+  tstart = data.frame(id = ids,
+                      tstart = tstart)
   
   # simulate event times
   if (is.null(hazard) &&
@@ -611,11 +615,11 @@ simsurv <- function(dist = c("weibull", "exponential", "gompertz"),
     tt <- sapply(ids, function(i) {
       x_i <- subset_df(x, i, idvar = idvar)
       betas_i <- subset_df(betas, i, idvar = idvar)
+      tstart_i <- subset_df(tstart, i, idvar = idvar)
       u_i <- stats::runif(1)
       # check whether S(t) is still greater than random uniform variable u_i at the
       # upper limit of uniroot's interval (otherwise uniroot will return an error)
-      at_limit <- rootfn_hazard(interval[2], hazard = hazard, x = x_i,
-                                betas = betas_i, u = u_i, rootfun = rootfun,
+      at_limit <- rootfn_hazard(interval[2], hazard = hazard, x = x_i, betas = betas_i, tstart_i = tstart_i,  u = u_i, rootfun = rootfun,
                                 qq = qq, ...)
       if (is.nan(at_limit)) {
         STOP_nan_at_limit()
@@ -628,7 +632,7 @@ simsurv <- function(dist = c("weibull", "exponential", "gompertz"),
       } else if (rootsolver == "uniroot") {
         t_i <- stats::uniroot(
           rootfn_hazard, hazard = hazard, x = x_i, betas = betas_i,
-          u = u_i, rootfun = rootfun, qq = qq, ..., interval = interval,
+          u = u_i, tstart_i = tstart_i, rootfun = rootfun, qq = qq, ..., interval = interval,
           check.conv = TRUE)$root
       } else if (rootsolver == "dfsane") {
         K <- 1E-6
@@ -942,11 +946,11 @@ validate_gammas <- function(gammas = NULL, dist, mixture) {
 # @param ... Further arguments passed to hazard.
 rootfn_hazard <- function(t, hazard, x = NULL, betas = NULL,
                           u = stats::runif(1), rootfun,
-                          qq = get_quadpoints(nodes = 15), ...) {
+                          qq = get_quadpoints(nodes = 15), tstart_i, ...) {
   qpts <- unstandardise_quadpoints(qq$points, 0, t)
   qwts <- unstandardise_quadweights(qq$weights, 0, t)
   cumhaz <- sum(unlist(lapply(1:length(qpts), function(q) {
-    qwts[[q]] * hazard(t = qpts[[q]], x = x, betas = betas, ...)
+    qwts[[q]] * hazard(t = qpts[[q]], x = x, betas = betas, tstart_i = tstart_i, ...)
   })))
   surv <- exp(-cumhaz)
   return_finite(rootfun(surv) - rootfun(u))

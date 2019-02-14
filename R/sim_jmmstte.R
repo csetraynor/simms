@@ -21,9 +21,9 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
                   betaEvent_continuous01 = 0.5,
                   betaEvent_continuous02 = 0.4,
                   betaEvent_continuous12 = 0.3,
-                  betaEvent_assoc01 = 0.5,
-                  betaEvent_assoc02 = 0.52,
-                  betaEvent_assoc12 = 0.54,
+                  betaEvent_assoc01 = 0.55,
+                  betaEvent_assoc02 = 0.57,
+                  betaEvent_assoc12 = 0.5,
                   betaEvent_aux01 = 1.2,
                   betaEvent_aux02 = 0.8,
                   betaEvent_aux12 = 0.9,
@@ -31,10 +31,11 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
                   prob_Z1 = 0.5,
                   mean_Z2 = 0, sd_Z2 = 1,
                   max_yobs = 10,
+                  cens = c(199, 199),
                   max_fuptime = 20,
                   balanced = FALSE,
                   family = gaussian,
-                  clust_control = list(),
+                  clust_control = NULL,
                   return_eta = FALSE,
                   seed = sample.int(.Machine$integer.max, 1),
                   interval = c(1E-8, 200)) {
@@ -340,7 +341,7 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
   transitions <- c("Event01", "Event02", "Event12")
   
   ss01 <- simsurv(# the following arguments apply to 'simsurv'
-    hazard = jm_hazard, x = covs, betas = betas, 
+    hazard = jmmstte_hazard, x = covs, betas = betas, 
     idvar = "id", ids = covs$id,
     maxt = max_fuptime, interval = interval,
     # the following arguments apply to 'jm_hazard'
@@ -349,20 +350,66 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
     assoc = assoc, family = family, grp_assoc = grp_assoc)
   
   ss02 <- simsurv(# the following arguments apply to 'simsurv'
-    hazard = jm_hazard, x = covs, betas = betas, 
+    hazard = jmmstte_hazard, x = covs, betas = betas, 
     idvar = "id", ids = covs$id,
     maxt = max_fuptime, interval = interval,
-    # the following arguments apply to 'jm_hazard'
+    # the following arguments apply to 'jmmstte_hazard'
     basehaz = basehaz[2], trans = 2, transitions = transitions,
     M = M, trajectory = fixed_trajectory,
     assoc = assoc, family = family, grp_assoc = grp_assoc)
   
-  yesR <- ss01$eventtime < ss02$eventtime
+  R <- ss01$eventtime
+  D <- ss02$eventtime
+  yesR <- R < D
+  
+  covs12 <- covs[yesR, ]
+  betas12 <- lapply(betas, function(d)  d[yesR, ])
+  tstart <- ss01$eventtime[yesR]
+  
+  ss12 <- simsurv(# the following arguments apply to 'simsurv'
+    hazard = jmmstte_hazard, x = covs12, betas = betas12, 
+    idvar = "id", ids = covs12$id, tstart = tstart,
+    maxt = max_fuptime, interval = interval,
+    # the following arguments apply to 'jmmstte_hazard'
+    basehaz = basehaz[3], trans = 3, transitions = transitions,
+    M = M, trajectory = fixed_trajectory,
+    assoc = assoc, family = family, grp_assoc = grp_assoc)
 
+  D[yesR] <- R[yesR] + ss12$eventtime
+  
+  delta1 <- rep(NA, n)
+  delta2 <- rep(NA, n)
+  y1 <- R
+  y2 <- D
+  # if(missing(cens)){
+  #   Cen <- c(max(c(y1, y2)) + 1, max(c(y1, y2)) + 2)
+  # } else {
+  #   Cen <- runif(n, cens[1], cens[2])
+  # }
+  
+  Cen <- runif(n, cens[1], cens[2])
+  
+  ind01 <- which(D < R & D < Cen)
+  y1[ind01] <- D[ind01]
+  delta1[ind01] <- 0
+  delta2[ind01] <- 1
+  ind10 <- which(R < D & R < Cen & D >= Cen)
+  y2[ind10] <- Cen[ind10]
+  delta1[ind10] <- 1
+  delta2[ind10] <- 0
+  ind00 <- which(R >= Cen & D >= Cen)
+  y1[ind00] <- Cen[ind00]
+  y2[ind00] <- Cen[ind00]
+  delta1[ind00] <- 0
+  delta2[ind00] <- 0
+  ind11 <- which(R < Cen & D < Cen & R < D)
+  delta1[ind11] <- 1
+  delta2[ind11] <- 1
+  ss <- data.frame(cbind(id = covs$id, df_time = y1, df_event = delta1, os_time = y2, os_event = delta2))
   
   # Construct data frame of event data
   dat <- list(
-    Event = data.frame(betas[["Event"]], covs, ss) # single row per subject
+    Event = dplyr::left_join( covs, ss, by = "id") # single row per subject
   )
   
   # Construct data frame of longitudinal data
@@ -433,11 +480,11 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
   # Prepare final datasets
   ret <- lapply(dat, function(x) {
     if ("tij" %in% colnames(x))
-      x <- x[x$tij <= x$eventtime, ] # only keep rows before event time
+      x <- x[x$tij <= x$os_time, ] # only keep rows before absorving time
     if (return_eta) {
-      sel <- grep("^id$|^clust|^Z|^tij|^Yij|^Xij|eventtime|status", colnames(x))
+      sel <- grep("^id$|^clust|^Z|^tij|^Yij|^Xij|os_time|os_event|df_time|df_event", colnames(x))
     } else {
-      sel <- grep("^id$|^clust|^Z|^tij|^Yij|eventtime|status", colnames(x))
+      sel <- grep("^id$|^clust|^Z|^tij|^Yij|os_time|os_event|df_time|df_event", colnames(x))
     }
     x <- x[, sel, drop = FALSE]
     rownames(x) <- NULL
@@ -469,11 +516,23 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
   if (any(fixed_trajectory %in% c("cubic")))
     long_params$betaLong_cubic <- betaLong_cubic
   event_params <- nlist(
-    betaEvent_intercept,
-    betaEvent_binary,
-    betaEvent_continuous,
-    betaEvent_assoc,
-    betaEvent_aux
+    betaEvent_intercept01,
+    betaEvent_binary01,
+    betaEvent_continuous01,
+    betaEvent_assoc01,
+    betaEvent_aux01,
+    
+    betaEvent_intercept02,
+    betaEvent_binary02,
+    betaEvent_continuous02,
+    betaEvent_assoc02,
+    betaEvent_aux02,
+    
+    betaEvent_intercept12,
+    betaEvent_binary12,
+    betaEvent_continuous12,
+    betaEvent_assoc12,
+    betaEvent_aux12
   )
   re_params <- nlist(
     b_sd,
@@ -516,8 +575,8 @@ sim_idm_jm <- function(n = 200, M = 1, n_trans = 3,
 # @param A list of family objects, providing the family (and link function)
 #   for each longitudinal submodel
 # @return A scalar
-jm_hazard <- function(t, x, betas, trans, transitions, basehaz = "weibull", M = 1,
-                      trajectory = "linear", assoc = "etavalue",
+jmmstte_hazard <- function(t, x, betas, trans, transitions, basehaz = "weibull", M = 1,
+                      trajectory = "linear", assoc = "etavalue", tstart_i,
                       family = list(gaussian()), grp_assoc = NULL) {
   
   if (t == 0)
@@ -536,6 +595,9 @@ jm_hazard <- function(t, x, betas, trans, transitions, basehaz = "weibull", M = 
     betas[[event]][["betaEvent_intercept"]] +
     betas[[event]][["betaEvent_binary"]] * x[["Z1"]] +
     betas[[event]][["betaEvent_continuous"]] * x[["Z2"]]
+  
+  # Add start time
+  t = t + tstart_i$tstart
   
   # Association structure
   for (m in 1:M) {

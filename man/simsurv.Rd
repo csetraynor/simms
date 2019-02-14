@@ -6,8 +6,8 @@
 \usage{
 simsurv(dist = c("weibull", "exponential", "gompertz"), lambdas, gammas,
   x, betas, tde, tdefunction = NULL, mixture = FALSE, pmix = 0.5,
-  hazard, loghazard, cumhazard, logcumhazard, idvar = NULL, ids = NULL,
-  nodes = 15, maxt = NULL, interval = c(1e-08, 500),
+  hazard, loghazard, cumhazard, logcumhazard, tstart = 0, idvar = NULL,
+  ids = NULL, nodes = 15, maxt = NULL, interval = c(1e-08, 500),
   rootsolver = c("uniroot", "dfsane"), rootfun = log,
   seed = sample.int(.Machine$integer.max, 1), ...)
 }
